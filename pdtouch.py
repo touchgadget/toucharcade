@@ -30,6 +30,7 @@ SOFTWARE.
 """
 
 import sys
+import os
 import pygame
 from pygame.locals import *
 import serial
@@ -61,10 +62,11 @@ DISPLAYSURF = pygame.display.set_mode((0, 0), pygame.FULLSCREEN | pygame.HWSURFA
 pygame.mouse.set_visible(False)
 if pygame.font:
     fontDefault = pygame.font.Font(None, 504)
+    fontSlider = pygame.font.Font(None, 120)
 
 class SlideBar:
     """ Project Diva slide bar """
-    def __init__(self, topLeft, bottomRight, rows, columns, gridlines, bgcolor):
+    def __init__(self, topLeft, bottomRight, rows, columns, gridlines, bgcolor, properties):
         """ Constructor """
         self.topLeft = topLeft
         self.bottomRight = bottomRight
@@ -77,6 +79,7 @@ class SlideBar:
         self.handsOld = []
         self.cell_height = (bottomRight[1] - topLeft[1]) / rows
         self.cell_width = (bottomRight[0] - topLeft[0]) / columns
+        self.cell_properties = properties
 
 
     def drawCell(self, rect, color):
@@ -102,8 +105,8 @@ class SlideBar:
         """
         Draw all slider cells.
         Draw grid of size width x height. Each element of the grid is a cell of
-        cell_width x cell_height. For example, given a screen size of 1920 x 1080 and a grid 32 cols and 1
-        row, cell_width = 1920 / 32 and cell_height = 1080 / 1
+        cell_width x cell_height. For example, given a screen size of 1920 x 1080 and
+        a grid 32 cols and 1 row, cell_width = 1920 / 32 and cell_height = 1080 / 1
         """
 
         for y in range(self.rows):
@@ -121,6 +124,11 @@ class SlideBar:
                 cell_center = (int(x * self.cell_width + self.cell_width/2),
                     int(y * self.cell_height + self.cell_height/2))
                 gridcell["button_center"] = cell_center
+                text = fontSlider.render(self.cell_properties[y*(self.rows-1) + x]['label'], 1, (10, 10, 10))
+                textpos = text.get_rect(center=cell_center)
+                gridcell['text'] = text
+                gridcell['textpos'] = textpos
+                DISPLAYSURF.blit(text, textpos)
                 LEDrect = pygame.Rect(self.topLeft[0] + x*self.cell_width,
                         self.topLeft[1] + y*self.cell_height,
                         self.cell_width, self.cell_height/8)
@@ -277,7 +285,42 @@ class SlideBar:
             self.hands.append(hand)
         return len(self.hands)
 
-Slider = SlideBar([0,0], [screen_width, screen_height/2], 1, 32, True, (192,192,192))
+# Properties for every cell, that is, 32
+SliderProps = [
+        {'label': '<'},
+        {'label': 'L'},
+        {'label': ' '},
+        {'label': ' '},
+        {'label': 'T'},
+        {'label': ' '},
+        {'label': 'O'},
+        {'label': ' '},
+        {'label': 'U'},
+        {'label': ' '},
+        {'label': 'C'},
+        {'label': ' '},
+        {'label': 'H'},
+        {'label': ' '},
+        {'label': ' '},
+        {'label': ' '},
+        {'label': ' '},
+        {'label': 'S'},
+        {'label': ' '},
+        {'label': 'L'},
+        {'label': ' '},
+        {'label': 'I'},
+        {'label': ' '},
+        {'label': 'D'},
+        {'label': ' '},
+        {'label': 'E'},
+        {'label': ' '},
+        {'label': 'R'},
+        {'label': ' '},
+        {'label': ' '},
+        {'label': 'R'},
+        {'label': '>'},
+]
+Slider = SlideBar([0,0], [screen_width, screen_height/2], 1, 32, True, (192,192,192), SliderProps)
 Slider.draw()
 
 class BigButtons:
@@ -299,7 +342,10 @@ class BigButtons:
         """ Draw one cell/button """
         rect = gridcell['rect']
         pygame.draw.rect(DISPLAYSURF, color, rect, 0)
-        DISPLAYSURF.blit(gridcell['text'], gridcell['textpos'])
+        if gridcell['picture']:
+            DISPLAYSURF.blit(gridcell['picture'], rect)
+        else:
+            DISPLAYSURF.blit(gridcell['text'], gridcell['textpos'])
         pygame.display.update(rect)
 
     def buttonOn(self, gridcell):
@@ -341,6 +387,7 @@ class BigButtons:
                 gridcell['text'] = text
                 gridcell['textpos'] = textpos
                 gridcell['color'] = self.properties[button_index]['buttonColor']
+                gridcell['picture'] = pygame.image.load(os.path.join('assets', self.properties[button_index]['picture']))
                 self.drawCell(gridcell, self.properties[button_index]['buttonColor'])
                 gridcell['nsButton'] = self.properties[button_index]['nsButton']
                 self.buttongrid.append(gridcell)
@@ -368,12 +415,12 @@ class BigButtons:
         return -1
 
 button_properties = [
-        {"label": "X", "buttonColor": [180,201,132], "nsButton": 3},
-        {"label": "Y", "buttonColor": [225,178,212], "nsButton": 0},
-        {"label": "B", "buttonColor": [143,181,220], "nsButton": 1},
-        {"label": "A", "buttonColor": [213, 62, 31], "nsButton": 2}
+    {"label": "X", "buttonColor": [180,201,132], "nsButton": 3, "picture": "triangle.png"},
+    {"label": "Y", "buttonColor": [225,178,212], "nsButton": 0, "picture": "square.png"},
+    {"label": "B", "buttonColor": [143,181,220], "nsButton": 1, "picture": "cross.png"},
+    {"label": "A", "buttonColor": [213, 62, 31], "nsButton": 2, "picture": "circle.png"}
 ]
-Buttons = BigButtons([0,screen_height/2], [screen_width, screen_height], 1, 4, False, (128,128,128), button_properties)
+Buttons = BigButtons([0,screen_height-screen_width/4], [screen_width, screen_height], 1, 4, False, (128,128,128), button_properties)
 Buttons.draw()
 
 # Up to 10 touches/fingers
