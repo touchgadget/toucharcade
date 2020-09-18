@@ -140,3 +140,15 @@ Switch.
 To emulate Switch controllers over Bluetooth, see https://github.com/mart1nro/joycontrol.
 It would be nice to use this to eliminate the Trinket M0 and all soldering.
 
+For another Python project that emulates a wireless Nintendo Pro Controller,
+see https://github.com/Brikwerk/nxbt.
+
+## Helpful Resources
+
+* http://pol.dip.jp/diva/ is in Japanese but Google Tranlate helps. The video
+  inspired me to build a controller although the hardware I use is very
+  different.
+
+* https://www.projectdiva.net/community/threads/project-diva-homemade-controllers.1465/
+  has helpful discussion by controller builders.
+
