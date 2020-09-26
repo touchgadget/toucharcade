@@ -59,6 +59,8 @@ pygame.init()
 #Create a display surface object
 DISPLAYSURF = pygame.display.set_mode((0, 0), pygame.FULLSCREEN | pygame.HWSURFACE | pygame.DOUBLEBUF)
 (screen_width, screen_height) = DISPLAYSURF.get_size()
+screen_width_max = screen_width - 1     # Max pixel co-ord
+screen_height_max = screen_height -1    # Max pixel co-ord
 pygame.mouse.set_visible(False)
 if pygame.font:
     fontDefault = pygame.font.Font(None, 504)
@@ -97,6 +99,8 @@ class SlideBar:
     def buttonOff(self, gridcell):
         """ Slide cell released """
         gridcell['buttonDown'] -= 1
+        if gridcell['buttonDown'] < 0:
+            gridcell['buttonDown'] = 0
         if gridcell['buttonDown'] == 0:
             gridcell['dirty'] = True
             #self.drawCell(gridcell['LEDrect'], self.bgcolor)
@@ -108,7 +112,7 @@ class SlideBar:
         cell_width x cell_height. For example, given a screen size of 1920 x 1080 and
         a grid 32 cols and 1 row, cell_width = 1920 / 32 and cell_height = 1080 / 1
         """
-
+        slider_index = 0
         for y in range(self.rows):
             for x in range(self.columns):
                 gridcell = {}
@@ -128,6 +132,7 @@ class SlideBar:
                 textpos = text.get_rect(center=cell_center)
                 gridcell['text'] = text
                 gridcell['textpos'] = textpos
+                gridcell['index'] = slider_index
                 DISPLAYSURF.blit(text, textpos)
                 LEDrect = pygame.Rect(self.topLeft[0] + x*self.cell_width,
                         self.topLeft[1] + y*self.cell_height,
@@ -135,10 +140,11 @@ class SlideBar:
                 gridcell["LEDrect"] = LEDrect
                 self.drawCell(LEDrect, self.bgcolor)
                 self.slidebar.append(gridcell)
+                slider_index += 1
             if self.gridLines:
                 # Draw horizontal grid lines
                 pygame.draw.line(DISPLAYSURF, (0, 0, 0),
-                        (0, y*self.cell_height), (screen_width-1, y*self.cell_height))
+                        (0, y*self.cell_height), (screen_width_max, y*self.cell_height))
         if self.gridLines:
             # Draw vertical grid lines
             for x in range(self.columns):
@@ -154,6 +160,8 @@ class SlideBar:
             if x >= self.columns:
                 x = self.columns-1
             y = int(y / self.cell_height)
+            if y >= self.rows:
+                y = self.rows - 1
             return self.slidebar[y*(self.rows-1) + x]
         return -1
 
@@ -320,7 +328,7 @@ SliderProps = [
         {'label': 'R'},
         {'label': '>'},
 ]
-Slider = SlideBar([0,0], [screen_width, screen_height/2], 1, 32, True, (192,192,192), SliderProps)
+Slider = SlideBar([0,0], [screen_width_max, (screen_height-screen_width/4)-1], 1, 32, True, (192,192,192), SliderProps)
 Slider.draw()
 
 class BigButtons:
@@ -334,6 +342,7 @@ class BigButtons:
         self.gridLines = gridlines
         self.bgcolor = bgcolor
         self.buttongrid = []
+        self.button_counts_old = []
         self.cell_height = (bottomRight[1] - topLeft[1]) / rows
         self.cell_width = (bottomRight[0] - topLeft[0]) / columns
         self.properties = properties
@@ -358,6 +367,8 @@ class BigButtons:
     def buttonOff(self, gridcell):
         """ Button released """
         gridcell['buttonDown'] -= 1
+        if gridcell['buttonDown'] < 0:
+            gridcell['buttonDown'] = 0
         if gridcell['buttonDown'] == 0:
             NSG.release(gridcell['nsButton'])
             self.drawCell(gridcell, gridcell['color'])
@@ -395,12 +406,20 @@ class BigButtons:
             if self.gridLines:
                 # Draw horizontal grid lines
                 pygame.draw.line(DISPLAYSURF, (0, 0, 0),
-                        (0, y*self.cell_height), (screen_width-1, y*self.cell_height))
+                        (0, y*self.cell_height), (screen_width_max, y*self.cell_height))
         if self.gridLines:
             # Draw vertical grid lines
             for x in range(self.columns):
                 pygame.draw.line(DISPLAYSURF, (0, 0, 0),
                         (x*self.cell_width, 0), (x*self.cell_width, screen_height-1))
+
+    def update(self):
+        button_counts = []
+        for gridcell in self.buttongrid:
+            button_counts.append(gridcell['buttonDown'])
+        if button_counts != self.button_counts_old:
+            print(button_counts)
+        self.button_counts_old = button_counts
 
     def touchToCell(self, x, y):
         """ Convert touch co-ordinates to cell """
@@ -411,6 +430,8 @@ class BigButtons:
             if x >= self.columns:
                 x = self.columns - 1
             y = int(y / self.cell_height)
+            if y >= self.rows:
+                y = self.rows - 1
             return self.buttongrid[y*(self.rows-1) + x]
         return -1
 
@@ -420,7 +441,7 @@ button_properties = [
     {"label": "B", "buttonColor": [143,181,220], "nsButton": 1, "picture": "cross.png"},
     {"label": "A", "buttonColor": [213, 62, 31], "nsButton": 2, "picture": "circle.png"}
 ]
-Buttons = BigButtons([0,screen_height-screen_width/4], [screen_width, screen_height], 1, 4, False, (128,128,128), button_properties)
+Buttons = BigButtons([0,screen_height-screen_width/4], [screen_width_max, screen_height_max], 1, 4, False, (128,128,128), button_properties)
 Buttons.draw()
 
 # Up to 10 touches/fingers
@@ -440,8 +461,8 @@ def main():
                 if event.key == K_ESCAPE:
                     mainLoop = False
             elif event.type == pygame.FINGERDOWN:
-                cell_x = event.x*screen_width
-                cell_y = event.y*screen_height
+                cell_x = int(event.x*screen_width_max)
+                cell_y = int(event.y*screen_height_max)
                 gridcell = Buttons.touchToCell(cell_x, cell_y)
                 if gridcell == -1:
                     gridcell = Slider.touchToCell(cell_x, cell_y)
@@ -449,17 +470,19 @@ def main():
                     gridcell['myself'].buttonOn(gridcell)
                 fingers[event.finger_id] = gridcell
             elif event.type == pygame.FINGERUP:
-                cell_x = event.x*screen_width
-                cell_y = event.y*screen_height
+                cell_x = int(event.x*screen_width_max)
+                cell_y = int(event.y*screen_height_max)
                 gridcell = Buttons.touchToCell(cell_x, cell_y)
                 if gridcell == -1:
                     gridcell = Slider.touchToCell(cell_x, cell_y)
                 if gridcell != -1:
                     gridcell['myself'].buttonOff(gridcell)
+                else:
+                    print('fu else', cell_x, cell_y)
                 fingers[event.finger_id] = gridcell
             elif event.type == pygame.FINGERMOTION:
-                cell_x = event.x*screen_width
-                cell_y = event.y*screen_height
+                cell_x = int(event.x*screen_width_max)
+                cell_y = int(event.y*screen_height_max)
                 gridcell_new = Slider.touchToCell(cell_x, cell_y)
                 if gridcell_new == -1:
                     gridcell_new = Buttons.touchToCell(cell_x, cell_y)
@@ -470,6 +493,9 @@ def main():
                             gridcell['myself'].buttonOff(gridcell)
                             gridcell_new['myself'].buttonOn(gridcell_new)
                             fingers[event.finger_id] = gridcell_new
+            else:
+                if event.type != pygame.VIDEOEXPOSE and event.type != pygame.MULTIGESTURE:
+                    print(event)
         Slider.update()
 
 if __name__ == "__main__":
