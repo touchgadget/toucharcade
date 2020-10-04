@@ -1,12 +1,16 @@
 # Touchscreen Monitor Arcade Controller
 
-Use a touchscreen monitor as an arcade controller for a Nintendo Switch.
+Use a touchscreen monitor as an arcade controller for a Nintendo Switch or
+Playstation 4.
 
 ![System Block Diagram](./images/systemoverview.gif)
 
 
 The following shows the touch areas on the monitor. The top half has the
 32 touch slider. The bottom half has four large buttons.
+
+The latest version for the PS4 includes gamepad buttons such as L1, R1, L2, R2,
+etc. on the top row.
 
 ![Touch regions on monitor](./images/touchareas.jpg)
 
@@ -22,13 +26,15 @@ In both cases, the touch USB out from the monitor goes to the Pi.
 
 ## Hardware
 
-* Nintendo Switch in dock. No hacks or mods.
+* Nintendo Switch in dock. Or Playstation 4. No hacks or mods.
 * Virzen Portable Monitor with 10-point touchscreen 13.3 inch.
 * Raspberry Pi 4. Older Pi's including the Pi Zero may also work but have not
   been tested.
-* Trinket M0 running NSGadget (Switch compatible gamepad software)
+* Trinket M0 running NSGadget (Switch compatible gamepad software) or
+  Trinket M0 running DS4Gadget (PS4 Dual Shock 4 compatible gamepad software)
 * Optional breadboard, 2x20 breakout adapter, etc.
 * Various HDMI and USB cables.
+* MayFlash Magic-S Pro Controller Adapter (only for PS4)
 
 ## USB NSGadget
 [This section is adapted from the NSGadget_Pi README.md]
@@ -54,6 +60,19 @@ the Arduino IDE, source code, or USB serial device driver.
 * Double tap the Trinket M0 reset button.
 * When the TRINKETBOOT USB drive appears, drop the UF2 file on to the drive.
 * Wait a few seconds until the Trinket M0 reboots.
+
+## USB DS4Gadget
+
+The hook up is the same as for the NSGadget but the firmware file name is
+firmware/DS4Gadget.ino.bin.uf2.
+
+WARNING: DS4Gadget does not support controller authentication so it
+will stop working after about 8 minutes. The MayFlash Magic-S Pro controller
+adapter solves this problem. I do not plan to add controller authentication.
+
+```
+PS4 -- MayFlash adapter -- Trinket M0/DS4Gadget -- Raspberry Pi
+```
 
 ## Prepare the Pi
 [This section and its two subsections are adapted from the NSGadget_Pi README.md]
@@ -120,6 +139,8 @@ python3 pdtouch.py
 
 ## Project Diva Touchscreen
 
+### Nintendo Switch
+
 ```
 python3 pdtouch.py
 ```
@@ -131,6 +152,19 @@ The slider has touch indicators at the top of the screen.
 TBD: Investigate turning off screen updates or breaking out screen updates to a
 separate thread. This might reduce lag. I do not see a lag problem but the
 lowest lag is always desirable.
+
+### Playstation 4
+
+The following runs the PS4 version with the slider in normal mode. The slider
+sends joystick movements. Use "--slider=dedicated" for dedicated arcade
+controller mode. Note the English version of PS4 Future Tone does not support
+dedicated mode. The Japanese version does although I have not verified this.
+
+```
+python3 ds4pdtouch.py --console=ps4 --slider=normal
+```
+
+At some point I will integrate the Switch and PS4 versions.
 
 ## Related projects
 
