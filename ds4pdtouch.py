@@ -119,7 +119,11 @@ class GamepadButtons(TouchAreas):
     def buttonOff(self, gridcell):
         """ Button released """
         if TouchAreas.buttonOff(self, gridcell):
-            self.drawCell(gridcell, self.bgcolor)
+            if gridcell.get('color'):
+                color = gridcell.get('color')
+            else:
+                color = self.bgcolor
+            self.drawCell(gridcell, color)
             button = gridcell['button']
             if button == DPadButton.UP or button == DPadButton.DOWN:
                 DS4G.dPadYAxis(128)
@@ -286,10 +290,10 @@ nsbutton_props = [
     {"label": "ZL", "button": NSButton.LEFT_THROTTLE},
     {"label": "L", "button": NSButton.LEFT_TRIGGER},
     {"label": "LSB/L3", "button": NSButton.LEFT_STICK},
-    {"label": "Up", "button": DPadButton.UP},
-    {"label": "Down", "button": DPadButton.DOWN},
-    {"label": "Left", "button": DPadButton.LEFT},
-    {"label": "Right", "button": DPadButton.RIGHT},
+    {"label": "Up", "buttonColor": [0, 128, 128], "button": DPadButton.UP},
+    {"label": "Down", "buttonColor": [0, 128, 128], "button": DPadButton.DOWN},
+    {"label": "Left", "buttonColor": [0, 128, 128], "button": DPadButton.LEFT},
+    {"label": "Right", "buttonColor": [0, 128, 128], "button": DPadButton.RIGHT},
     {"label": "-", "button": NSButton.MINUS},
     {"label": "Capture", "button": NSButton.CAPTURE},
     {"label": "Home", "button": NSButton.HOME},
@@ -302,10 +306,10 @@ ps4button_props = [
     {"label": "L2", "button": DS4Button.L2},
     {"label": "L1", "button": DS4Button.L1},
     {"label": "L3", "button": DS4Button.L3},
-    {"label": "Up", "button": DPadButton.UP},
-    {"label": "Down", "button": DPadButton.DOWN},
-    {"label": "Left", "button": DPadButton.LEFT},
-    {"label": "Right", "button": DPadButton.RIGHT},
+    {"label": "Up", "buttonColor": [0, 128, 128], "button": DPadButton.UP},
+    {"label": "Down", "buttonColor": [0, 128, 128], "button": DPadButton.DOWN},
+    {"label": "Left", "buttonColor": [0, 128, 128], "button": DPadButton.LEFT},
+    {"label": "Right", "buttonColor": [0, 128, 128], "button": DPadButton.RIGHT},
     {"label": "Share", "button": DS4Button.SHARE},
     {"label": "Logo", "button": DS4Button.LOGO},
     {"label": "TPad", "button": DS4Button.TPAD},
@@ -322,7 +326,7 @@ elif console == 'switch':
 else:
     props = None
 
-gamepad_buttons = GamepadButtons([0,0], [screen_width_max, (screen_height / 16) - 1], 1, 14, False, (128,128,128), fontGamepadButton, props, DISPLAYSURF)
+gamepad_buttons = GamepadButtons([0,0], [screen_width_max, (screen_height / 16) - 1], 1, 14, True, (128,128,128), fontGamepadButton, props, DISPLAYSURF)
 gamepad_buttons.draw()
 
 # Properties for every cell, that is, 32
@@ -360,7 +364,7 @@ SliderProps = [
         {'label': 'R'},
         {'label': '>'},
 ]
-Slider = SlideBar([0,(screen_height/16)], [screen_width_max, (screen_height-screen_width/4)-1], 1, 32, True, (192,192,192), fontSlider, SliderProps, DISPLAYSURF)
+Slider = SlideBar([0,(screen_height/16)], [screen_width_max, (screen_height-screen_width/4)-1], 1, 32, False, (192,192,192), fontSlider, SliderProps, DISPLAYSURF)
 Slider.draw()
 
 ps4button_properties = [

@@ -57,8 +57,8 @@ class DS4Button(IntEnum):
     OPTIONS = 9
     L3 = 10
     R3 = 11
-    TPAD = 12
-    LOGO = 13
+    LOGO = 12
+    TPAD = 13
 
 # dPad Button names
 class DPadButton(IntEnum):
