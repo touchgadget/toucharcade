@@ -27,11 +27,10 @@ class TouchAreas:
         picture = gridcell.get('picture')
         if picture:
             self.displaysurf.blit(picture, rect)
-        else:
-            text = gridcell.get('text')
-            textpos = gridcell.get('textpos')
-            if text and textpos:
-                self.displaysurf.blit(text, textpos)
+        text = gridcell.get('text')
+        textpos = gridcell.get('textpos')
+        if text and textpos:
+            self.displaysurf.blit(text, textpos)
         pygame.display.update(rect)
 
     def draw(self):
@@ -64,9 +63,7 @@ class TouchAreas:
                         self.displaysurf.blit(text, textpos)
                     if props.get('picture') != None:
                         gridcell['picture'] = pygame.image.load(os.path.join('assets', props['picture']))
-                    gridcell['color'] = self.bgcolor
-                    if props.get('buttonColor') != None:
-                        gridcell['color'] = props['buttonColor']
+                    gridcell['color'] = props.get('buttonColor', self.bgcolor)
                     self.drawCell(gridcell, gridcell['color'])
                     if props.get('button') != None:
                         gridcell['button'] = props['button']

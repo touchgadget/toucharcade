@@ -30,13 +30,51 @@ SOFTWARE.
 """
 
 import sys
+import getopt
 import os
 import pygame
 from pygame.locals import *
 import serial
+from touchareas import TouchAreas
+from ds4gpadserial import DS4GamepadSerial, DS4Button, DPadButton
 from nsgpadserial import NSGamepadSerial, NSButton
 
-NSG = NSGamepadSerial()
+try:
+    opts, args = getopt.getopt(sys.argv[1:], "hslc", ["help", "slider=", "layout=", "console="])
+except getopt.GetoptError as err:
+    print(err)
+    #usage()
+    sys.exit(2)
+layout = 2
+slider = "dedicated"
+console = "switch"
+for o, a in opts:
+    if o in ("-h", "--help"):
+        #usage()
+        sys.exit()
+    elif o in ("-s","--slider"):
+        if a in ("n", "normal"):
+            slider = "normal"
+        elif a in ("d", "dedicated"):
+            slider = "dedicated"
+    elif o in ("-c","--console"):
+        if a in ("p", "ps4"):
+            console = "ps4"
+    elif o in ("-l","--layout"):
+        if a == "3":
+            layout = 3
+    else:
+        assert False, "unhandled option"
+print("console=", console, "slider=", slider)
+
+if console == "ps4":
+    Gamepad = DS4GamepadSerial()
+elif console == "switch":
+    Gamepad = NSGamepadSerial()
+else:
+    #usage()
+    sys.exit()
+
 try:
     # Raspberry Pi UART on pins 14,15
     NS_SERIAL = serial.Serial('/dev/ttyAMA0', 2000000, timeout=0)
@@ -47,9 +85,9 @@ except:
         NS_SERIAL = serial.Serial('/dev/ttyUSB0', 2000000, timeout=0)
         print("Found ttyUSB0")
     except:
-        print("NSGadget serial port not found")
+        print("Gadget serial port not found")
         sys.exit(1)
-NSG.begin(NS_SERIAL)
+Gamepad.begin(NS_SERIAL)
 
 if not pygame.font:
     print("Warning, fonts disabled")
@@ -65,109 +103,68 @@ pygame.mouse.set_visible(False)
 if pygame.font:
     fontDefault = pygame.font.Font(None, 504)
     fontSlider = pygame.font.Font(None, 120)
+    fontGamepadButton = pygame.font.Font(None, 36)
 
-class SlideBar:
-    """ Project Diva slide bar """
-    def __init__(self, topLeft, bottomRight, rows, columns, gridlines, bgcolor, properties):
-        """ Constructor """
-        self.topLeft = topLeft
-        self.bottomRight = bottomRight
-        self.rows = rows
-        self.columns = columns
-        self.gridLines = gridlines
-        self.bgcolor = bgcolor
-        self.slidebar = []
-        self.hands = []
-        self.handsOld = []
-        self.cell_height = (bottomRight[1] - topLeft[1]) / rows
-        self.cell_width = (bottomRight[0] - topLeft[0]) / columns
-        self.cell_properties = properties
-
-
-    def drawCell(self, rect, color):
-        pygame.draw.rect(DISPLAYSURF, color, rect, 0)
-
+class GamepadButtons(TouchAreas):
+    """ PS4/DS4 buttons """
     def buttonOn(self, gridcell):
-        """ Slide cell touched """
-        gridcell['buttonDown'] += 1
-        if gridcell['buttonDown'] == 1:
-            # dirty means the cell on screen must be updated. Updates are
-            # deferred so they can be done more efficiently later in update().
-            gridcell['dirty'] = True
-            #self.drawCell(gridcell['LEDrect'], (0, 128, 128))
+        """ Button touched/pressed """
+        if TouchAreas.buttonOn(self, gridcell):
+            self.drawCell(gridcell, (0, 128, 128))
+            button = gridcell['button']
+            if button == DPadButton.UP:
+                Gamepad.dPadYAxis(0)
+            elif button == DPadButton.DOWN:
+                Gamepad.dPadYAxis(255)
+            elif button == DPadButton.LEFT:
+                Gamepad.dPadXAxis(0)
+            elif button == DPadButton.RIGHT:
+                Gamepad.dPadXAxis(255)
+            else:
+                Gamepad.press(gridcell['button'])
 
     def buttonOff(self, gridcell):
-        """ Slide cell released """
-        gridcell['buttonDown'] -= 1
-        if gridcell['buttonDown'] < 0:
-            gridcell['buttonDown'] = 0
-        if gridcell['buttonDown'] == 0:
-            gridcell['dirty'] = True
-            #self.drawCell(gridcell['LEDrect'], self.bgcolor)
+        """ Button released """
+        if TouchAreas.buttonOff(self, gridcell):
+            self.drawCell(gridcell, gridcell['color'])
+            button = gridcell['button']
+            if button == DPadButton.UP or button == DPadButton.DOWN:
+                Gamepad.dPadYAxis(128)
+            elif button == DPadButton.LEFT or button == DPadButton.RIGHT:
+                Gamepad.dPadXAxis(128)
+            else:
+                Gamepad.release(gridcell['button'])
 
-    def draw(self):
-        """
-        Draw all slider cells.
-        Draw grid of size width x height. Each element of the grid is a cell of
-        cell_width x cell_height. For example, given a screen size of 1920 x 1080 and
-        a grid 32 cols and 1 row, cell_width = 1920 / 32 and cell_height = 1080 / 1
-        """
-        slider_index = 0
-        for y in range(self.rows):
-            for x in range(self.columns):
-                gridcell = {}
-                gridcell['myself'] = self
-                gridcell["buttonDown"] = 0
-                gridcell["buttonDownOld"] = 0
-                gridcell['dirty'] = False
-                rect = pygame.Rect(self.topLeft[0] + x*self.cell_width,
-                        self.topLeft[1] + y*self.cell_height,
-                        self.cell_width, self.cell_height)
-                gridcell["rect"] = rect
-                self.drawCell(rect, self.bgcolor)
-                cell_center = (int(x * self.cell_width + self.cell_width/2),
-                    int(y * self.cell_height + self.cell_height/2))
-                gridcell["button_center"] = cell_center
-                text = fontSlider.render(self.cell_properties[y*(self.rows-1) + x]['label'], 1, (10, 10, 10))
-                textpos = text.get_rect(center=cell_center)
-                gridcell['text'] = text
-                gridcell['textpos'] = textpos
-                gridcell['index'] = slider_index
-                DISPLAYSURF.blit(text, textpos)
-                LEDrect = pygame.Rect(self.topLeft[0] + x*self.cell_width,
-                        self.topLeft[1] + y*self.cell_height,
-                        self.cell_width, self.cell_height/8)
-                gridcell["LEDrect"] = LEDrect
-                self.drawCell(LEDrect, self.bgcolor)
-                self.slidebar.append(gridcell)
-                slider_index += 1
-            if self.gridLines:
-                # Draw horizontal grid lines
-                pygame.draw.line(DISPLAYSURF, (0, 0, 0),
-                        (0, y*self.cell_height), (screen_width_max, y*self.cell_height))
-        if self.gridLines:
-            # Draw vertical grid lines
-            for x in range(self.columns):
-                pygame.draw.line(DISPLAYSURF, (0, 0, 0),
-                        (x*self.cell_width, 0), (x*self.cell_width, screen_height-1))
+class SlideBar(TouchAreas):
+    """ Project Diva slide bar """
+    def __init__(self, topLeft, bottomRight, rows, columns, gridlines, bgcolor, font, properties, displaysurf):
+        """ Constructor """
+        TouchAreas.__init__(self, topLeft, bottomRight, rows, columns, gridlines, bgcolor, font, properties, displaysurf)
+        self.hands = []
+        self.handsOld = []
 
-    def touchToCell(self, x, y):
-        """ Convert touch co-ordinates to cell array offset """
-        x = int(x)
-        y = int(y)
-        if (x >= self.topLeft[0]) and (x <= self.bottomRight[0]) and (y >= self.topLeft[1]) and (y <= self.bottomRight[1]):
-            x = int(x / self.cell_width)
-            if x >= self.columns:
-                x = self.columns-1
-            y = int(y / self.cell_height)
-            if y >= self.rows:
-                y = self.rows - 1
-            return self.slidebar[y*(self.rows-1) + x]
-        return -1
+    def buttonOn(self, gridcell):
+        """ Button touched/pressed """
+        if TouchAreas.buttonOn(self, gridcell):
+            self.drawCell(gridcell, (0, 128, 128))
+            self.update()
+
+    def buttonOff(self, gridcell):
+        """ Button released """
+        if TouchAreas.buttonOff(self, gridcell):
+            self.drawCell(gridcell, self.bgcolor)
+            self.update()
+
+    def fingerMove(self, gridcell, gridcell_new):
+        if TouchAreas.buttonOn(self, gridcell_new):
+            self.drawCell(gridcell_new, (0, 128, 128))
+        if TouchAreas.buttonOff(self, gridcell):
+            self.drawCell(gridcell, self.bgcolor)
+        self.update()
 
     def update(self):
         """
-        Update the screen for all changed(dirty) cells. Also send slider
+        Update the screen for all changed(modified) cells. Also send slider
         bits out to Switch.
         TBD: updating the screen might be increasing latency. Maybe add
         command line option to draw grid but not update screen on touches.
@@ -175,69 +172,54 @@ class SlideBar:
         #entry_ticks = pygame.time.get_ticks()
         slider_bits = 0
         bit_count = 31
-        dirty_count = 0
-        update_rect = []
-        for gridcell in self.slidebar:
+        for gridcell in self.cells:
             buttonDown = gridcell['buttonDown']
-            if gridcell['dirty']:
-                dirty_count += 1
-                gridcell['dirty'] = False
-                if buttonDown != gridcell['buttonDownOld']:
-                    rect = gridcell['LEDrect']
-                    update_rect.append(rect)
-                    if buttonDown > 0:
-                        self.drawCell(rect, (0, 128, 128))
-                    else:
-                        self.drawCell(rect, self.bgcolor)
-
             if buttonDown > 0:
                 slider_bits |= (1 << bit_count)
             bit_count -= 1
-            gridcell['buttonDownOld'] = buttonDown
 
-        if dirty_count > 0:
-            #rect_ticks = pygame.time.get_ticks()
-            pygame.display.update(update_rect)
-            #print('update_rec', pygame.time.get_ticks() - rect_ticks)
-            print('%08x %d %d' % (slider_bits, dirty_count, len(update_rect)))
-            NSG.allAxes(slider_bits ^ 0x80808080)
-            #print('update ms', pygame.time.get_ticks() - entry_ticks)
-            # Code for tracking hands and hand motion no longer useful but
-            # this might be useful for the PS4.
-            if False:
-                num_hands = self.find_hands(slider_bits)
-                print('hands', num_hands, self.hands)
-                if num_hands == 0:
-                    NSG.leftXAxis(128)
-                    NSG.rightXAxis(128)
-                elif num_hands == 1 and len(self.handsOld) > 0:
-                    moved = self.detect_motion(self.hands[0], self.handsOld[0])
-                    print('hand=1, moved=', moved)
-                    if moved > 0:
-                        NSG.rightXAxis(255)
-                    elif moved < 0:
-                        NSG.leftXAxis(0)
-                    else:
-                        NSG.leftXAxis(128)
-                        NSG.rightXAxis(128)
-                elif num_hands == 2 and len(self.handsOld) > 1:
-                    moved = self.detect_motion(self.hands[0], self.handsOld[0])
-                    print('hand=2, left moved=', moved)
-                    if moved > 0:
-                        NSG.leftXAxis(255)
-                    elif moved < 0:
-                        NSG.leftXAxis(0)
-                    else:
-                        NSG.leftXAxis(128)
-                    moved = self.detect_motion(self.hands[1], self.handsOld[1])
-                    print('hand=2, right moved=', moved)
-                    if moved > 0:
-                        NSG.rightXAxis(255)
-                    elif moved < 0:
-                        NSG.rightXAxis(0)
-                    else:
-                        NSG.rightXAxis(128)
-                self.handsOld = self.hands
+        #rect_ticks = pygame.time.get_ticks()
+        #print('update_rec', pygame.time.get_ticks() - rect_ticks)
+        print('%08x' % (slider_bits))
+        #print('update ms', pygame.time.get_ticks() - entry_ticks)
+        # Code for tracking hands and hand motion no longer useful but
+        # this might be useful for the PS4.
+        if slider == "dedicated":
+            Gamepad.allAxes(slider_bits ^ 0x80808080)
+        else:
+            num_hands = self.find_hands(slider_bits)
+            print('hands', num_hands, self.hands)
+            if num_hands == 0:
+                Gamepad.leftXAxis(128)
+                Gamepad.rightXAxis(128)
+            elif num_hands == 1 and len(self.handsOld) > 0:
+                moved = self.detect_motion(self.hands[0], self.handsOld[0])
+                print('hand=1, moved=', moved)
+                if moved > 0:
+                    Gamepad.rightXAxis(255)
+                elif moved < 0:
+                    Gamepad.leftXAxis(0)
+                else:
+                    Gamepad.leftXAxis(128)
+                    Gamepad.rightXAxis(128)
+            elif num_hands == 2 and len(self.handsOld) > 1:
+                moved = self.detect_motion(self.hands[0], self.handsOld[0])
+                print('hand=2, left moved=', moved)
+                if moved > 0:
+                    Gamepad.leftXAxis(255)
+                elif moved < 0:
+                    Gamepad.leftXAxis(0)
+                else:
+                    Gamepad.leftXAxis(128)
+                moved = self.detect_motion(self.hands[1], self.handsOld[1])
+                print('hand=2, right moved=', moved)
+                if moved > 0:
+                    Gamepad.rightXAxis(255)
+                elif moved < 0:
+                    Gamepad.rightXAxis(0)
+                else:
+                    Gamepad.rightXAxis(128)
+            self.handsOld = self.hands
 
     def detect_motion(self, handsNew, handsOld):
         print(handsNew, handsOld)
@@ -293,6 +275,63 @@ class SlideBar:
             self.hands.append(hand)
         return len(self.hands)
 
+class BigButtons(TouchAreas):
+    """ Big buttons """
+    def buttonOn(self, gridcell):
+        """ Button touched/pressed """
+        if TouchAreas.buttonOn(self, gridcell):
+            Gamepad.press(gridcell['button'])
+            self.drawCell(gridcell, (255, 255, 255))
+
+    def buttonOff(self, gridcell):
+        """ Button released """
+        if TouchAreas.buttonOff(self, gridcell):
+            Gamepad.release(gridcell['button'])
+            self.drawCell(gridcell, gridcell['color'])
+
+nsbutton_props = [
+    {"label": "ZL", "button": NSButton.LEFT_THROTTLE},
+    {"label": "L", "button": NSButton.LEFT_TRIGGER},
+    {"label": "LSB/L3", "button": NSButton.LEFT_STICK},
+    {"label": "Up", "buttonColor": [0, 128, 128], "button": DPadButton.UP},
+    {"label": "Down", "buttonColor": [0, 128, 128], "button": DPadButton.DOWN},
+    {"label": "Left", "buttonColor": [0, 128, 128], "button": DPadButton.LEFT},
+    {"label": "Right", "buttonColor": [0, 128, 128], "button": DPadButton.RIGHT},
+    {"label": "-", "button": NSButton.MINUS},
+    {"label": "Capture", "button": NSButton.CAPTURE},
+    {"label": "Home", "button": NSButton.HOME},
+    {"label": "+", "button": NSButton.PLUS},
+    {"label": "RSB/R3", "button": NSButton.RIGHT_STICK},
+    {"label": "R", "button": NSButton.RIGHT_TRIGGER},
+    {"label": "ZR", "button": NSButton.RIGHT_THROTTLE}
+]
+ps4button_props = [
+    {"label": "L2", "button": DS4Button.L2},
+    {"label": "L1", "button": DS4Button.L1},
+    {"label": "L3", "button": DS4Button.L3},
+    {"label": "Up", "buttonColor": [0, 128, 128], "button": DPadButton.UP},
+    {"label": "Down", "buttonColor": [0, 128, 128], "button": DPadButton.DOWN},
+    {"label": "Left", "buttonColor": [0, 128, 128], "button": DPadButton.LEFT},
+    {"label": "Right", "buttonColor": [0, 128, 128], "button": DPadButton.RIGHT},
+    {"label": "Share", "button": DS4Button.SHARE},
+    {"label": "Logo", "button": DS4Button.LOGO},
+    {"label": "TPad", "button": DS4Button.TPAD},
+    {"label": "Options", "button": DS4Button.OPTIONS},
+    {"label": "R3", "button": DS4Button.R3},
+    {"label": "R1", "button": DS4Button.R1},
+    {"label": "R2", "button": DS4Button.R2}
+]
+
+if console == 'ps4':
+    props = ps4button_props
+elif console == 'switch':
+    props = nsbutton_props
+else:
+    props = None
+
+gamepad_buttons = GamepadButtons([0,0], [screen_width_max, (screen_height / 16) - 1], 1, 14, True, (128,128,128), fontGamepadButton, props, DISPLAYSURF)
+gamepad_buttons.draw()
+
 # Properties for every cell, that is, 32
 SliderProps = [
         {'label': '<'},
@@ -328,120 +367,28 @@ SliderProps = [
         {'label': 'R'},
         {'label': '>'},
 ]
-Slider = SlideBar([0,0], [screen_width_max, (screen_height-screen_width/4)-1], 1, 32, True, (192,192,192), SliderProps)
+Slider = SlideBar([0,(screen_height/16)], [screen_width_max, (screen_height-screen_width/4)-1], 1, 32, False, (192,192,192), fontSlider, SliderProps, DISPLAYSURF)
 Slider.draw()
 
-class BigButtons:
-    """ Big buttons """
-    def __init__(self, topLeft, bottomRight, rows, columns, gridlines, bgcolor, properties):
-        """ Constructor """
-        self.topLeft = topLeft
-        self.bottomRight = bottomRight
-        self.rows = rows
-        self.columns = columns
-        self.gridLines = gridlines
-        self.bgcolor = bgcolor
-        self.buttongrid = []
-        self.button_counts_old = []
-        self.cell_height = (bottomRight[1] - topLeft[1]) / rows
-        self.cell_width = (bottomRight[0] - topLeft[0]) / columns
-        self.properties = properties
-
-    def drawCell(self, gridcell, color):
-        """ Draw one cell/button """
-        rect = gridcell['rect']
-        pygame.draw.rect(DISPLAYSURF, color, rect, 0)
-        if gridcell['picture']:
-            DISPLAYSURF.blit(gridcell['picture'], rect)
-        else:
-            DISPLAYSURF.blit(gridcell['text'], gridcell['textpos'])
-        pygame.display.update(rect)
-
-    def buttonOn(self, gridcell):
-        """ Button touched/pressed """
-        gridcell['buttonDown'] += 1
-        if gridcell['buttonDown'] == 1:
-            NSG.press(gridcell['nsButton'])
-            self.drawCell(gridcell, (255, 255, 255))
-
-    def buttonOff(self, gridcell):
-        """ Button released """
-        gridcell['buttonDown'] -= 1
-        if gridcell['buttonDown'] < 0:
-            gridcell['buttonDown'] = 0
-        if gridcell['buttonDown'] == 0:
-            NSG.release(gridcell['nsButton'])
-            self.drawCell(gridcell, gridcell['color'])
-
-    def draw(self):
-        """
-        Draw all buttons. Usually called only once.
-        Draw grid of size width x height. Each element of the grid is a cell of
-        cell_width x cell_height. For example, given a screen size of 1920 x 1080 and a grid 32 cols and 1
-        row, cell_width = 1920 / 32 and cell_height = 1080 / 1
-        """
-        button_index = 0
-        for y in range(self.rows):
-            for x in range(self.columns):
-                gridcell = {}
-                gridcell['myself'] = self
-                gridcell["buttonDown"] = 0
-                rect = pygame.Rect(self.topLeft[0] + x*self.cell_width,
-                        self.topLeft[1] + y*self.cell_height,
-                        self.cell_width, self.cell_height)
-                gridcell["rect"] = rect
-                cell_center = (self.topLeft[0] + int(x * self.cell_width + self.cell_width/2),
-                    self.topLeft[1] + int(y * self.cell_height + self.cell_height/2))
-                gridcell["button_center"] = cell_center
-                text = fontDefault.render(self.properties[button_index]['label'], 1, (10, 10, 10))
-                textpos = text.get_rect(center=cell_center)
-                gridcell['text'] = text
-                gridcell['textpos'] = textpos
-                gridcell['color'] = self.properties[button_index]['buttonColor']
-                gridcell['picture'] = pygame.image.load(os.path.join('assets', self.properties[button_index]['picture']))
-                self.drawCell(gridcell, self.properties[button_index]['buttonColor'])
-                gridcell['nsButton'] = self.properties[button_index]['nsButton']
-                self.buttongrid.append(gridcell)
-                button_index = button_index + 1
-            if self.gridLines:
-                # Draw horizontal grid lines
-                pygame.draw.line(DISPLAYSURF, (0, 0, 0),
-                        (0, y*self.cell_height), (screen_width_max, y*self.cell_height))
-        if self.gridLines:
-            # Draw vertical grid lines
-            for x in range(self.columns):
-                pygame.draw.line(DISPLAYSURF, (0, 0, 0),
-                        (x*self.cell_width, 0), (x*self.cell_width, screen_height-1))
-
-    def update(self):
-        button_counts = []
-        for gridcell in self.buttongrid:
-            button_counts.append(gridcell['buttonDown'])
-        if button_counts != self.button_counts_old:
-            print(button_counts)
-        self.button_counts_old = button_counts
-
-    def touchToCell(self, x, y):
-        """ Convert touch co-ordinates to cell """
-        x = int(x)
-        y = int(y)
-        if (x >= self.topLeft[0]) and (x <= self.bottomRight[0]) and (y >= self.topLeft[1]) and (y <= self.bottomRight[1]):
-            x = int(x / self.cell_width)
-            if x >= self.columns:
-                x = self.columns - 1
-            y = int(y / self.cell_height)
-            if y >= self.rows:
-                y = self.rows - 1
-            return self.buttongrid[y*(self.rows-1) + x]
-        return -1
-
-button_properties = [
-    {"label": "X", "buttonColor": [180,201,132], "nsButton": 3, "picture": "triangle.png"},
-    {"label": "Y", "buttonColor": [225,178,212], "nsButton": 0, "picture": "square.png"},
-    {"label": "B", "buttonColor": [143,181,220], "nsButton": 1, "picture": "cross.png"},
-    {"label": "A", "buttonColor": [213, 62, 31], "nsButton": 2, "picture": "circle.png"}
+ps4bigbutton_properties = [
+    {'buttonColor': [180,201,132], 'button': DS4Button.TRIANGLE, 'picture': 'triangle.png'},
+    {'buttonColor': [225,178,212], 'button': DS4Button.SQUARE, 'picture': 'square.png'},
+    {'buttonColor': [143,181,220], 'button': DS4Button.CROSS, 'picture': 'cross.png'},
+    {'buttonColor': [213, 62, 31], 'button': DS4Button.CIRCLE, 'picture': 'circle.png'}
 ]
-Buttons = BigButtons([0,screen_height-screen_width/4], [screen_width_max, screen_height_max], 1, 4, False, (128,128,128), button_properties)
+nsbigbutton_properties = [
+    {'label': 'X', 'buttonColor': [180,201,132], 'button': NSButton.X, 'picture': 'triangle.png'},
+    {'label': 'Y', 'buttonColor': [225,178,212], 'button': NSButton.Y, 'picture': 'square.png'},
+    {'label': 'B', 'buttonColor': [143,181,220], 'button': NSButton.B, 'picture': 'cross.png'},
+    {'label': 'A', 'buttonColor': [213, 62, 31], 'button': NSButton.A, 'picture': 'circle.png'}
+]
+if console == "ps4":
+    props = ps4bigbutton_properties
+elif console == "switch":
+    props = nsbigbutton_properties
+else:
+    props = None
+Buttons = BigButtons([0,screen_height-screen_width/4], [screen_width_max, screen_height_max], 1, 4, False, (128,128,128), fontGamepadButton, props, DISPLAYSURF)
 Buttons.draw()
 
 # Up to 10 touches/fingers
@@ -463,40 +410,40 @@ def main():
             elif event.type == pygame.FINGERDOWN:
                 cell_x = int(event.x*screen_width_max)
                 cell_y = int(event.y*screen_height_max)
-                gridcell = Buttons.touchToCell(cell_x, cell_y)
-                if gridcell == -1:
-                    gridcell = Slider.touchToCell(cell_x, cell_y)
-                if gridcell != -1:
-                    gridcell['myself'].buttonOn(gridcell)
-                fingers[event.finger_id] = gridcell
+                for touch_area in (Slider, Buttons, gamepad_buttons):
+                    gridcell = touch_area.touchToCell(cell_x, cell_y)
+                    if gridcell != -1:
+                        gridcell['myself'].buttonOn(gridcell)
+                        fingers[event.finger_id] = gridcell
+                        break
             elif event.type == pygame.FINGERUP:
                 cell_x = int(event.x*screen_width_max)
                 cell_y = int(event.y*screen_height_max)
-                gridcell = Buttons.touchToCell(cell_x, cell_y)
-                if gridcell == -1:
-                    gridcell = Slider.touchToCell(cell_x, cell_y)
-                if gridcell != -1:
-                    gridcell['myself'].buttonOff(gridcell)
-                else:
-                    print('fu else', cell_x, cell_y)
-                fingers[event.finger_id] = gridcell
+                for touch_area in (Slider, Buttons, gamepad_buttons):
+                    gridcell = touch_area.touchToCell(cell_x, cell_y)
+                    if gridcell != -1:
+                        gridcell['myself'].buttonOff(gridcell)
+                        fingers[event.finger_id] = gridcell
+                        break
             elif event.type == pygame.FINGERMOTION:
                 cell_x = int(event.x*screen_width_max)
                 cell_y = int(event.y*screen_height_max)
-                gridcell_new = Slider.touchToCell(cell_x, cell_y)
-                if gridcell_new == -1:
-                    gridcell_new = Buttons.touchToCell(cell_x, cell_y)
-                if gridcell_new != -1:
-                    gridcell = fingers[event.finger_id]
-                    if gridcell != -1:
-                        if gridcell_new != gridcell:
-                            gridcell['myself'].buttonOff(gridcell)
-                            gridcell_new['myself'].buttonOn(gridcell_new)
-                            fingers[event.finger_id] = gridcell_new
+                for touch_area in (Slider, Buttons, gamepad_buttons):
+                    gridcell_new = touch_area.touchToCell(cell_x, cell_y)
+                    if gridcell_new != -1:
+                        gridcell = fingers[event.finger_id]
+                        if gridcell != -1:
+                            if gridcell_new != gridcell:
+                                if gridcell['myself'] == Slider and gridcell['myself'] == Slider:
+                                    gridcell['myself'].fingerMove(gridcell, gridcell_new)
+                                else:
+                                    gridcell['myself'].buttonOff(gridcell)
+                                    gridcell_new['myself'].buttonOn(gridcell_new)
+                                fingers[event.finger_id] = gridcell_new
+                                break
             else:
                 if event.type != pygame.VIDEOEXPOSE and event.type != pygame.MULTIGESTURE:
                     print(event)
-        Slider.update()
 
 if __name__ == "__main__":
     main()

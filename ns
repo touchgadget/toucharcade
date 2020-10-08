@@ -1,0 +1,3 @@
+#!/bin/sh
+python3 pdtouch.py --console=switch --slider=normal
+#python3 pdtouch.py --console=switch --slider=dedicated

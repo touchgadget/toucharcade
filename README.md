@@ -1,7 +1,7 @@
 # Touchscreen Monitor Arcade Controller
 
 Use a touchscreen monitor as an arcade controller for a Nintendo Switch or
-Playstation 4.
+PlayStation 4.
 
 ![System Block Diagram](./images/systemoverview.gif)
 
@@ -26,7 +26,7 @@ In both cases, the touch USB out from the monitor goes to the Pi.
 
 ## Hardware
 
-* Nintendo Switch in dock. Or Playstation 4. No hacks or mods.
+* Nintendo Switch in dock. Or PlayStation 4. No hacks or mods.
 * Virzen Portable Monitor with 10-point touchscreen 13.3 inch.
 * Raspberry Pi 4. Older Pi's including the Pi Zero may also work but have not
   been tested.
@@ -139,32 +139,29 @@ python3 pdtouch.py
 
 ## Project Diva Touchscreen
 
+pdtouch.py displays a Project Diva controller, reads touches, and writes
+gamepad button presses to the game console. It currently supports
+PlayStation 4 and Nintendo Switch.
+
+The `--slider==normal` option sends joystick movements for slides. Use
+"--slider=dedicated" when using a dedicated arcade controller. Note the English
+version of PS4 Future Tone does not support dedicated mode. The Japanese
+version supports dedicated mode. The Nintendo Switch supports both modes but
+the dedicated controller mode defaults off.
+
 ### Nintendo Switch
 
 ```
-python3 pdtouch.py
+python3 pdtouch.py --console=switch --slider=normal
+python3 pdtouch.py --console=switch --slider=dedicated
 ```
 
-Read fingerup, fingerdown, and fingermove events from touchscreen and write
-Switch HID gamepad reports out UART. The four big buttons flash when touched.
-The slider has touch indicators at the top of the screen.
-
-TBD: Investigate turning off screen updates or breaking out screen updates to a
-separate thread. This might reduce lag. I do not see a lag problem but the
-lowest lag is always desirable.
-
-### Playstation 4
-
-The following runs the PS4 version with the slider in normal mode. The slider
-sends joystick movements. Use "--slider=dedicated" for dedicated arcade
-controller mode. Note the English version of PS4 Future Tone does not support
-dedicated mode. The Japanese version does although I have not verified this.
+### PlayStation 4
 
 ```
-python3 ds4pdtouch.py --console=ps4 --slider=normal
+python3 pdtouch.py --console=ps4 --slider=normal
+python3 pdtouch.py --console=ps4 --slider=dedicated
 ```
-
-At some point I will integrate the Switch and PS4 versions.
 
 ## Related projects
 
