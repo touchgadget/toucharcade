@@ -329,7 +329,7 @@ elif console == 'switch':
 else:
     props = None
 
-gamepad_buttons = GamepadButtons([0,0], [screen_width_max, (screen_height / 16) - 1], 1, 14, True, (128,128,128), fontGamepadButton, props, DISPLAYSURF)
+gamepad_buttons = GamepadButtons([0,0], [screen_width_max, (screen_height / 16) - 1], 1, 14, False, (128,128,128), fontGamepadButton, props, DISPLAYSURF)
 gamepad_buttons.draw()
 
 # Properties for every cell, that is, 32

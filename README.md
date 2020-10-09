@@ -7,12 +7,15 @@ PlayStation 4.
 
 
 The following shows the touch areas on the monitor. The top half has the
-32 touch slider. The bottom half has four large buttons.
+32 region touch slider. The bottom half has four large buttons.
 
-The latest version for the PS4 includes gamepad buttons such as L1, R1, L2, R2,
-etc. on the top row.
+The latest version for the PlayStation 4 and Nintendo Switch includes gamepad
+buttons such as direcitonal pad L1, R1, L2, R2, etc. on the top row.
 
-![Touch regions on monitor](./images/touchareas.jpg)
+![Touch regions on monitor for PlayStation 4](./images/touchareas_ps4.jpg)
+
+
+![Touch regions on monitor for Nintendo Switch](./images/touchareas_ns.jpg)
 
 One option is to plug the Switch HDMI out into the touchscreen monitor.
 This creates a Switch MegaMix Tap Play mode but on an external monitor.
